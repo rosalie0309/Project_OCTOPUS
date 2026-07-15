@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Évaluation — Posidonia Segmentation</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+    :root {
+        --ocean-deep:  #041c2c;
+        --ocean-mid:   #063a5c;
+        --ocean-light: #0a5c8a;
+        --teal:        #0e9e8e;
+        --teal-bright: #12d4be;
+        --sand-light:  #f5f0e8;
+        --posidonia:   #4caf72;
+        --fp-red:      #e05252;
+        --fn-blue:     #4a8fd4;
+        --text-dim:    #8fb3c8;
+        --yellow:      #ffc800;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: 'DM Sans', sans-serif;
+        background: var(--ocean-deep);
+        color: var(--sand-light);
+        min-height: 100vh;
+    }
+    body::before {
+        content: ''; position: fixed; inset: 0;
+        background:
+        radial-gradient(ellipse 80% 50% at 20% 80%, rgba(10,92,138,0.25) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 20%, rgba(14,158,142,0.15) 0%, transparent 50%);
+        pointer-events: none; z-index: 0;
+    }
+
+    /* ── header ── */
+    header {
+        position: relative; z-index: 1;
+        padding: 1.5rem 3rem;
+        border-bottom: 1px solid rgba(14,158,142,0.2);
+        display: flex; align-items: center; gap: 1.5rem;
+    }
+    .logo {
+        width: 40px; height: 40px;
+        background: linear-gradient(135deg, var(--teal), var(--ocean-light));
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+    }
+    header h1 {
+        font-family: 'Space Mono', monospace;
+        font-size: 1rem; color: var(--teal-bright);
+    }
+    .nav-link {
+        margin-left: auto;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.7rem; color: var(--teal);
+        text-decoration: none;
+        border: 1px solid var(--teal);
+        padding: 0.3rem 0.7rem; border-radius: 4px;
+    }
+    .nav-link:hover { background: rgba(14,158,142,0.1); }
+
+    /* ── main ── */
+    main {
+        position: relative; z-index: 1;
+        max-width: 1300px; margin: 0 auto;
+        padding: 2rem 3rem;
+    }
+
+    /* ── config panel ── */
+    .config-panel {
+        background: rgba(6,58,92,0.4);
+        border: 1px solid rgba(14,158,142,0.15);
+        border-radius: 16px; padding: 2rem;
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1.5rem; margin-bottom: 2rem;
+    }
+    .config-group label {
+        display: block;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.7rem; color: var(--teal);
+        text-transform: uppercase; margin-bottom: 0.5rem;
+    }
+    .config-group select,
+    .config-group input[type=range] {
+        width: 100%;
+        background: rgba(6,58,92,0.6);
+        border: 1px solid rgba(14,158,142,0.3);
+        border-radius: 6px; color: var(--sand-light);
+        padding: 0.5rem; font-family: 'DM Sans', sans-serif;
+        font-size: 0.85rem;
+        accent-color: var(--teal-bright);
+    }
+
+    /* ── run button ── */
+    .run-btn {
+        width: 100%; padding: 0.9rem;
+        background: linear-gradient(135deg, var(--teal), var(--ocean-light));
+        border: none; border-radius: 10px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.85rem; font-weight: 700;
+        color: white; cursor: pointer;
+        transition: all 0.25s;
+        align-self: end;
+    }
+    .run-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(14,158,142,0.3);
+    }
+    .run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── loader ── */
+    #loader { display: none; text-align: center; padding: 3rem; color: var(--teal); }
+    .spinner {
+        width: 40px; height: 40px; border-radius: 50%;
+        border: 3px solid rgba(14,158,142,0.2);
+        border-top-color: var(--teal-bright);
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── results ── */
+    #results { display: none; }
+    .section-title {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.75rem; letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--teal);
+        margin: 2rem 0 1rem;
+        display: flex; align-items: center; gap: 0.75rem;
+    }
+    .section-title::after {
+        content: ''; flex: 1; height: 1px;
+        background: rgba(14,158,142,0.2);
+    }
+
+    /* ── metrics table ── */
+    .metrics-table {
+        width: 100%; border-collapse: collapse;
+        font-size: 0.82rem; margin-bottom: 2rem;
+    }
+    .metrics-table th {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.65rem; text-transform: uppercase;
+        color: var(--teal); padding: 0.6rem 0.8rem;
+        border-bottom: 1px solid rgba(14,158,142,0.3);
+        text-align: left;
+    }
+    .metrics-table td {
+        padding: 0.6rem 0.8rem;
+        border-bottom: 1px solid rgba(14,158,142,0.08);
+    }
+    .metrics-table tr:hover td { background: rgba(14,158,142,0.05); }
+    .metrics-table tr.ensemble-row td {
+        background: rgba(18,212,190,0.06);
+        border-top: 1px solid rgba(18,212,190,0.3);
+        border-bottom: 1px solid rgba(18,212,190,0.3);
+    }
+    .metrics-table tr.ensemble-row td:first-child {
+        color: var(--teal-bright);
+        font-weight: 600;
+    }
+    .best { color: var(--posidonia); font-weight: 700; }
+    .pill {
+        display: inline-block; padding: 0.15rem 0.45rem;
+        border-radius: 3px; font-family: 'Space Mono', monospace;
+        font-size: 0.7rem; font-weight: 700;
+    }
+    .pill-f1   { background: rgba(76,175,114,0.18); color: var(--posidonia); }
+    .pill-iou  { background: rgba(14,158,142,0.18); color: var(--teal-bright); }
+    .pill-fp   { background: rgba(224,82,82,0.18);  color: var(--fp-red); }
+    .pill-fn   { background: rgba(74,143,212,0.18); color: var(--fn-blue); }
+    .pill-auc  { background: rgba(255,200,0,0.15);  color: var(--yellow); }
+
+  .figure-card {
+    background: var(--card-bg, #fff);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+    footer {
+        text-align: center; padding: 1.5rem;
+        font-size: 0.72rem; color: var(--text-dim);
+        border-top: 1px solid rgba(14,158,142,0.1);
+        position: relative; z-index: 1;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <i class="bi bi-flower1" style="color:white; font-size:1.2rem;"></i>
+  </div>
+  <div>
+    <h1>POSIDONIA — ÉVALUATION DES MODÈLES</h1>
+  </div>
+  <a href="/" class="nav-link">
+    <i class="bi bi-arrow-left"></i> Segmentation
+  </a>
+</header>
+
+<main>
+
+    <!-- Configuration -->
+    <div class="config-panel">
+
+      <div class="config-group" style="grid-column: span 3;">
+        <label for="pipeline-select">
+          <i class="bi bi-diagram-3"></i> Pipeline expérimental
+        </label>
+
+      <select id="pipeline-select" multiple size="7">
+        {% for exp_name, pipeline in pipelines.items() %}
+          <option value="{{ exp_name }}">
+            {{ pipeline.label }}
+          </option>
+        {% endfor %}
+      </select>
+
+      <p style="font-size:0.68rem; color:var(--text-dim); margin-top:0.4rem;">
+        Maintenir Ctrl pour sélectionner plusieurs pipelines.
+        Si plusieurs pipelines sont sélectionnés, un modèle d'ensemble est calculé.
+      </p>
+      </div>
+      
+        <div class="config-group">
+        <label><i class="bi bi-database"></i> Split</label>
+        <select id="split-select">
+          <option value="test">Test</option>
+          <option value="val">Validation</option>
+          <option value="both" selected>Val + Test</option>
+        </select>
+        </div>
+
+        <div class="config-group">
+        <label><i class="bi bi-people"></i> Méthode ensemble</label>
+            <select id="method-select">
+            <option value="soft">Vote souple (sur les probabilités prédites on fait la moyenne) </option>
+            <option value="hard">Vote majoritaire (sur les prédictions binaires) </option>
+        
+            </select>
+        </div>
+
+
+        <div class="config-group">
+          <label for="threshold-mode-select">Mode de seuil</label>
+          <select id="threshold-mode-select">
+            <option value="fixed" selected>Seuil fixe 0.5</option>
+            <option value="calibrated">Seuil calibré validation</option>
+          </select>
+        </div>
+
+        <div class="config-group">
+          <label for="uncertainty-mode-select">Mode d'incertitude</label>
+          <select id="uncertainty-mode-select">
+            <option value="standard" selected>Dirichlet standard, centre 0.5</option>
+            <option value="threshold">Dirichlet adapté au seuil</option>
+          </select>
+        </div>
+
+        <div class="config-group" style="display:flex; align-items:flex-end;">
+        <button class="run-btn" id="run-btn">
+            <i class="bi bi-play-fill"></i> LANCER L'ÉVALUATION
+        </button>
+        </div>
+
+
+        <!-- Modèles actifs 
+        <div class="config-group">
+        <label><i class="bi bi-check2-square"></i> Modèles actifs</label>
+        <div id="model-checkboxes"></div>
+        </div>
+        -->
+
+    </div>
+
+  <!-- Loader -->
+  <div id="loader">
+    <div class="spinner"></div>
+    <p id="loader-msg" style="font-family:'Space Mono',monospace; font-size:0.8rem">
+      Évaluation en cours…
+    </p>
+  </div>
+
+  <!-- Résultats -->
+  <div id="results">
+
+    <div id="pipeline-info" style="
+    display:none;
+    background: rgba(6,58,92,0.45);
+    border: 1px solid rgba(18,212,190,0.25);
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.82rem;
+  ">
+    <div class="section-title" style="margin-top:0;">
+      Pipeline sélectionné
+    </div>
+
+    <p><strong>Expérience :</strong> <span id="pipeline-experiment"></span></p>
+    <p><strong>Label :</strong> <span id="pipeline-label"></span></p>
+    <p><strong>Architecture :</strong> <span id="pipeline-architecture"></span></p>
+    <p><strong>Loss :</strong> <span id="pipeline-loss"></span></p>
+    <p><strong>Résolution :</strong> <span id="pipeline-resolution"></span></p>
+    <p><strong>Prétraitement :</strong> <span id="pipeline-preprocess"></span></p>
+    <p><strong>Seuil calibré enregistré :</strong> <span id="pipeline-threshold"></span></p>
+    <p><strong>Checkpoint :</strong> <span id="pipeline-checkpoint"></span></p>
+  </div>
+
+    <div class="section-title">Métriques globales — <span id="split-label-display"></span></div>
+
+    <table class="metrics-table" id="metrics-table">
+      <thead>
+        <tr>
+          <th>Modèle</th>
+          <th>F1</th>
+          <th>IoU</th>
+          <th>mIoU</th>
+          <th>Accuracy</th>
+          <th>Précision</th>
+          <th>Recall</th>
+          <th>Fall-out</th>
+          <th>FP %</th>
+          <th>FN %</th>
+          <th>AUC-ROC</th>
+          <th>AUC-PR</th>
+          <th>Seuil</th>
+          <th>Temps inf. moyen</th>
+          <th>Incertain %</th>
+          <th>Désaccord %</th>
+          <th>Dirichlet</th>
+          <th>Incertain Dirichlet %</th>
+        </tr>
+      </thead>
+      <tbody id="metrics-body"></tbody>
+    </table>
+
+    <div id="kfold-summary-block" style="
+      display:none;
+      background: rgba(6,58,92,0.45);
+      border: 1px solid rgba(18,212,190,0.25);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.82rem;
+    ">
+      <div class="section-title" style="margin-top:0;">
+        Synthèse validation croisée — moyenne ± écart-type
+      </div>
+
+      <p id="kfold-summary-description" style="margin-bottom:0.8rem;"></p>
+
+      <table class="metrics-table">
+        <thead>
+          <tr>
+            <th>Métrique</th>
+            <th>Moyenne</th>
+            <th>Écart-type</th>
+            <th>n folds</th>
+          </tr>
+        </thead>
+        <tbody id="kfold-summary-body"></tbody>
+      </table>
+    </div>
+
+    <div id="eval-config-summary" class="eval-summary"></div>
+
+    <div class="section-title">Courbes ROC & Précision-Rappel</div>
+    <div class="figure-card">
+      <img id="roc-pr-img" src="" alt="Courbes ROC et PR" style="width:100%; border-radius:8px;">
+    </div>
+
+    <div class="section-title">Matrices de confusion</div>
+    <div class="figure-card">
+      <img id="confusion-img" src="" alt="Matrices de confusion" style="width:100%; border-radius:8px;">
+    </div>
+
+  </div>
+
+</main>
+
+<footer>
+  Stage M2 Informatique · Université Sorbonne Paris Nord · GREAH Laboratory · Le Havre
+</footer>
+
+<script>
+
+// ── Déclarations slider (AVANT le fetch) ──
+// ── Charge config au démarrage ──
+fetch('/config')
+  .then(r => r.json())
+  .then(cfg => {
+    window.appConfig = cfg;
+
+    renderModelCheckboxes();
+
+    document
+      .getElementById('threshold-mode-select')
+      .addEventListener('change', () => {
+        renderModelCheckboxes();
+      });
+  });
+
+
+function getThresholdsForCurrentMode() {
+  const cfg = window.appConfig || {};
+  const mode = document.getElementById('threshold-mode-select').value;
+
+  if (mode === 'calibrated') {
+    return cfg.calibrated_thresholds || {};
+  }
+
+  return cfg.fixed_thresholds || {};
+}
+
+function formatDisplayedThreshold(name) {
+  const cfg = window.appConfig || {};
+  const mode = document.getElementById('threshold-mode-select').value;
+  const thresholds = getThresholdsForCurrentMode();
+
+  if (mode === 'calibrated') {
+    const value = thresholds[name];
+
+    if (value === undefined || value === null) {
+      return 'seuil calib. absent -> 0.50';
+    }
+
+    return `seuil calib.=${Number(value).toFixed(2)}`;
+  }
+
+  const fixedValue = thresholds[name] ?? cfg.decision_threshold ?? 0.5;
+  return `seuil fixe=${Number(fixedValue).toFixed(2)}`;
+}
+
+function renderModelCheckboxes() {
+  const cfg = window.appConfig || {};
+  const models = cfg.models || [];
+
+  const container = document.getElementById('model-checkboxes');
+  if (!container) return;
+
+  // Garder les modèles déjà cochés si on change juste le mode de seuil
+  const previouslyChecked = new Set(
+    Array.from(document.querySelectorAll('input[name="selected_models"]:checked'))
+      .map(cb => cb.value)
+  );
+
+  container.innerHTML = '';
+
+  models.forEach(name => {
+    const id = 'chk-' + name.replace(/\s/g, '-');
+    const div = document.createElement('div');
+
+    div.style.cssText = 'display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;';
+
+    const shouldBeChecked =
+      previouslyChecked.size === 0 || previouslyChecked.has(name);
+
+    div.innerHTML = `
+      <input type="checkbox" name="selected_models" value="${name}"
+             id="${id}" ${shouldBeChecked ? 'checked' : ''}
+             style="accent-color:var(--teal-bright); width:14px; height:14px;">
+
+      <label for="${id}" style="font-size:0.78rem; cursor:pointer;">
+        ${name}
+        <span style="font-size:0.65rem; color:var(--text-dim);">
+          (${formatDisplayedThreshold(name)})
+        </span>
+      </label>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+
+
+// Palette de couleurs pour les modèles
+const COLORS = [
+  '#12d4be', '#4caf72', '#e05252', '#4a8fd4',
+  '#ffc800', '#c084fc', '#fb923c'
+];
+
+document
+  .getElementById('pipeline-select')
+  .addEventListener('change', updateEnsembleControls);
+
+updateEnsembleControls();
+
+document.getElementById('run-btn').addEventListener('click', async () => {
+  const split     = document.getElementById('split-select').value;
+  const method    = document.getElementById('method-select').value;
+  const btn = document.getElementById('run-btn');
+  if (btn.disabled) return;
+
+  const selectedModels = Array.from(
+    document.querySelectorAll('input[name="selected_models"]:checked')
+  ).map(cb => cb.value);
+
+  const selectedPipelines = Array.from(
+    document.getElementById('pipeline-select').selectedOptions
+  ).map(opt => opt.value);
+
+  if (selectedPipelines.length === 0) {
+    alert("Veuillez sélectionner au moins un pipeline.");
+    return;
+  }
+
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('loader').style.display  = 'block';
+  document.getElementById('run-btn').disabled      = true;
+
+  const splitText = split === 'both' ? 'validation + test'
+                   : split === 'val' ? 'validation' : 'test';
+  document.getElementById('loader-msg').textContent =
+    `Évaluation sur le ${splitText} set…`;
+
+  try {
+    const resp = await fetch('/run_evaluate', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pipeline_names: selectedPipelines,
+        split,
+        method,
+        threshold_mode: document.getElementById('threshold-mode-select').value,
+        uncertainty_mode: document.getElementById('uncertainty-mode-select').value
+      })
+    });
+    const data = await resp.json();
+
+    if (data.error) { alert(data.error); return; }
+
+    if (
+      data.pipeline_mode &&
+      Array.isArray(data.selected_pipelines) &&
+      data.selected_pipelines.length > 0
+    ) {
+      const p = data.selected_pipelines[0];
+
+      document.getElementById('pipeline-info').style.display = 'block';
+
+      document.getElementById('pipeline-experiment').textContent =
+        p.experiment_name || '-';
+
+      document.getElementById('pipeline-label').textContent =
+        p.label || '-';
+
+      document.getElementById('pipeline-architecture').textContent =
+        p.architecture || '-';
+
+      document.getElementById('pipeline-loss').textContent =
+        p.loss || '-';
+
+      document.getElementById('pipeline-resolution').textContent =
+        `${p.img_h || '-'}x${p.img_w || '-'}`;
+
+      document.getElementById('pipeline-preprocess').textContent =
+        p.preprocess || 'Aucun prétraitement';
+
+      document.getElementById('pipeline-threshold').textContent =
+        p.val_threshold !== null && p.val_threshold !== undefined
+          ? Number(p.val_threshold).toFixed(2)
+          : 'Non disponible';
+
+      document.getElementById('pipeline-checkpoint').textContent =
+        p.checkpoint_path || '-';
+
+    } else {
+      document.getElementById('pipeline-info').style.display = 'none';
+    }
+
+    let thresholdModeText;
+
+    if (data.threshold_mode === 'calibrated') {
+      thresholdModeText = 'seuil calibré sur la validation';
+    } else {
+      thresholdModeText = 'seuil fixe 0.5';
+    }
+
+    const uncertaintyModeText = data.uncertainty_mode === 'threshold'
+      ? 'Dirichlet adapté au seuil'
+      : 'Dirichlet standard, centre 0.5';
+
+    const votingText = data.ensemble_pipeline_mode
+      ? ` · ${data.method} voting`
+      : '';
+
+    document.getElementById('split-label-display').textContent =
+      `${data.n_images_info} · ${thresholdModeText}${votingText}`;
+
+    const ensembleSummary = data.ensemble_pipeline_mode
+      ? ` &nbsp; | &nbsp; <strong>Méthode ensemble :</strong> ${data.method} voting`
+      : '';
+
+    document.getElementById('eval-config-summary').innerHTML = `
+      <strong>Mode de seuil :</strong> ${thresholdModeText}
+      &nbsp; | &nbsp;
+      <strong>Mode d'incertitude :</strong> ${uncertaintyModeText}
+      ${ensembleSummary}
+    `;
+    // Affiche le tableau de métriques — priorise test si disponible, sinon val
+    const tableResults = data.results_test || data.results_val;
+    renderMetricsTable(tableResults);
+
+    // Affiche la synthèse k-fold si disponible
+    const kfoldSummary = data.kfold_summary_test || data.kfold_summary_val;
+    renderKfoldSummary(kfoldSummary);
+
+    // Affiche les deux figures générées côté serveur
+    document.getElementById('roc-pr-img').src    = 'data:image/png;base64,' + data.roc_pr_image;
+    document.getElementById('confusion-img').src = 'data:image/png;base64,' + data.confusion_image;
+
+    document.getElementById('loader').style.display  = 'none';
+    document.getElementById('results').style.display = 'block';
+
+  } catch(err) {
+    alert('Erreur : ' + err.message);
+  } finally {
+    document.getElementById('run-btn').disabled     = false;
+    document.getElementById('loader').style.display = 'none';
+  }
+});
+
+function pct(v) { return (v * 100).toFixed(2) + '%'; }
+function fmt(v) { return v.toFixed(4); }
+
+function renderMetricsTable(results) {
+  const tbody = document.getElementById('metrics-body');
+  tbody.innerHTML = '';
+
+  const names = Object.keys(results);
+  const isEns = name => name.toLowerCase().includes('ensemble');
+
+  // Trouver les meilleurs pour colorer
+  const best = {};
+
+  ['f1', 'iou', 'miou', 'accuracy', 'precision', 'recall', 'auc_roc', 'auc_pr'].forEach(k => {
+    best[k] = Math.max(...names.map(n => results[n][k]));
+  });
+
+  ['fallout'].forEach(k => {
+    best[k] = Math.min(...names.map(n => results[n][k]));
+  });
+
+  names.forEach(name => {
+    const m = results[name];   // IMPORTANT : m est défini ici
+    const ens = isEns(name);
+    const tr = document.createElement('tr');
+
+    if (ens) tr.className = 'ensemble-row';
+
+    const total = m.tp + m.fp + m.fn + m.tn;
+    const fpPct = total > 0 ? (m.fp / total * 100).toFixed(1) + '%' : '—';
+    const fnPct = total > 0 ? (m.fn / total * 100).toFixed(1) + '%' : '—';
+
+    // ===============================
+    // Incertitude Dirichlet
+    // ===============================
+    let uncertainPct = '—';
+    let disagreementPct = '—';
+    let dirichletMean = '—';
+    let dirichletUncertainPct = '—';
+
+    if (m.uncertainty) {
+      if (m.uncertainty.uncertain_pixel_percent !== undefined) {
+        uncertainPct = m.uncertainty.uncertain_pixel_percent.toFixed(2) + '%';
+      }
+
+      if (m.uncertainty.disagreement_percent !== undefined) {
+        disagreementPct = m.uncertainty.disagreement_percent.toFixed(2) + '%';
+      }
+
+      if (m.uncertainty.dirichlet_uncertainty_norm_mean !== undefined) {
+        dirichletMean = m.uncertainty.dirichlet_uncertainty_norm_mean.toFixed(4);
+      }
+
+      if (m.uncertainty.dirichlet_uncertain_pixel_percent !== undefined) {
+        dirichletUncertainPct = m.uncertainty.dirichlet_uncertain_pixel_percent.toFixed(2) + '%';
+      }
+    }
+    const cell = (val, key, formatted) => {
+      const isBest = Math.abs(results[name][key] - best[key]) < 1e-6;
+      return `<td class="${isBest ? 'best' : ''}">${formatted}</td>`;
+    };
+
+    let thresholdUsed = '—';
+
+    if (m.threshold_used !== undefined) {
+      if (m.threshold_used === 'individual_calibrated_thresholds') {
+        thresholdUsed = 'seuils calibrés individuels';
+      } else if (typeof m.threshold_used === 'number') {
+        thresholdUsed = m.threshold_used.toFixed(2);
+      } else {
+        const parsed = Number(m.threshold_used);
+        thresholdUsed = Number.isNaN(parsed) ? m.threshold_used : parsed.toFixed(2);
+      }
+    }
+
+    let inferenceTime = '—';
+
+    if (m.inference_time_mean_s !== undefined) {
+      const mean = Number(m.inference_time_mean_s);
+      const std = Number(m.inference_time_std_s || 0);
+
+      inferenceTime = `${mean.toFixed(4)} s`;
+
+      if (std > 0) {
+        inferenceTime += ` ± ${std.toFixed(4)}`;
+      }
+    }
+    tr.innerHTML = `
+      <td style="font-weight:600">${name}</td>
+
+      ${cell(m.f1, 'f1', `<span class="pill pill-f1">${fmt(m.f1)}</span>`)}
+      ${cell(m.iou, 'iou', `<span class="pill pill-iou">${fmt(m.iou)}</span>`)}
+
+      <td>${fmt(m.miou)}</td>
+      <td>${pct(m.accuracy)}</td>
+      <td>${fmt(m.precision)}</td>
+      <td>${fmt(m.recall)}</td>
+
+      ${cell(m.fallout, 'fallout', `<span class="pill pill-fp">${pct(m.fallout)}</span>`)}
+
+      <td><span class="pill pill-fp">${fpPct}</span></td>
+      <td><span class="pill pill-fn">${fnPct}</span></td>
+
+      ${cell(m.auc_roc, 'auc_roc', `<span class="pill pill-auc">${fmt(m.auc_roc)}</span>`)}
+      ${cell(m.auc_pr, 'auc_pr', `<span class="pill pill-auc">${fmt(m.auc_pr)}</span>`)}
+
+      <td><span class="pill pill-auc">${thresholdUsed}</span></td>
+      <td><span class="pill pill-iou">${inferenceTime}</span></td>
+      <td><span class="pill pill-auc">${uncertainPct}</span></td>
+      <td><span class="pill pill-auc">${disagreementPct}</span></td>
+      <td><span class="pill pill-auc">${dirichletMean}</span></td>
+      <td><span class="pill pill-auc">${dirichletUncertainPct}</span></td>
+          `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+function renderKfoldSummary(summary) {
+  const block = document.getElementById('kfold-summary-block');
+  const desc = document.getElementById('kfold-summary-description');
+  const tbody = document.getElementById('kfold-summary-body');
+
+  if (!summary) {
+    block.style.display = 'none';
+    return;
+  }
+
+  if (summary.available === false) {
+    block.style.display = 'block';
+    desc.textContent = summary.reason || "Synthèse K-fold non disponible.";
+    tbody.innerHTML = '';
+    return;
+  }
+
+  if (!summary.available || !summary.metrics) {
+    block.style.display = 'none';
+    return;
+  }
+
+  block.style.display = 'block';
+
+  const resolution = `${summary.img_h}×${summary.img_w}`;
+  const preprocess = summary.preprocess || "Aucun prétraitement";
+
+  desc.textContent =
+    `${summary.model} — ${summary.loss} — ${resolution} — ${preprocess} — folds : ${summary.folds.join(", ")}`;
+
+  tbody.innerHTML = '';
+
+  const metricLabels = {
+    accuracy: "Accuracy",
+    precision: "Précision",
+    recall: "Recall",
+    f1: "Dice/F1",
+    iou: "IoU",
+    miou: "mIoU",
+    fallout: "Fall-out",
+    auc_roc: "AUC-ROC",
+    auc_pr: "AUC-PR"
+  };
+
+  Object.entries(summary.metrics).forEach(([key, value]) => {
+    const tr = document.createElement('tr');
+
+    tr.innerHTML = `
+      <td>${metricLabels[key] || key}</td>
+      <td>${value.mean.toFixed(4)}</td>
+      <td>${value.std.toFixed(4)}</td>
+      <td>${value.n}</td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+function updateEnsembleControls() {
+  const selectedPipelines = Array.from(
+    document.getElementById('pipeline-select').selectedOptions
+  ).map(opt => opt.value);
+
+  const methodSelect = document.getElementById('method-select');
+
+  if (selectedPipelines.length <= 1) {
+    methodSelect.disabled = true;
+    methodSelect.style.opacity = "0.5";
+    methodSelect.title = "La méthode d'ensemble est disponible seulement avec au moins deux pipelines.";
+  } else {
+    methodSelect.disabled = false;
+    methodSelect.style.opacity = "1";
+    methodSelect.title = "";
+  }
+}
+
+</script>
+</body>
+</html>

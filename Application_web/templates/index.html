@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Posidonia Segmentation</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  :root {
+    --ocean-deep:   #041c2c;
+    --ocean-mid:    #063a5c;
+    --ocean-light:  #0a5c8a;
+    --teal:         #0e9e8e;
+    --teal-bright:  #12d4be;
+    --sand:         #e8dfc8;
+    --sand-light:   #f5f0e8;
+    --posidonia:    #4caf72;
+    --fp-red:       #e05252;
+    --fn-blue:      #4a8fd4;
+    --white:        #ffffff;
+    --text-dim:     #8fb3c8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--ocean-deep);
+    color: var(--sand-light);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── background ocean texture ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 80%, rgba(10,92,138,0.25) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 20%, rgba(14,158,142,0.15) 0%, transparent 50%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── header ── */
+  header {
+    position: relative; z-index: 1;
+    padding: 2.5rem 3rem 2rem;
+    border-bottom: 1px solid rgba(14,158,142,0.2);
+    display: flex; align-items: center; gap: 1.5rem;
+  }
+
+  .logo {
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, var(--teal), var(--ocean-light));
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem;
+  }
+
+  header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.25rem; font-weight: 700;
+    color: var(--teal-bright);
+    letter-spacing: -0.02em;
+  }
+
+  header p {
+    font-size: 0.8rem; color: var(--text-dim);
+    margin-top: 0.15rem; font-weight: 300;
+  }
+
+  .badge {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem; font-weight: 700;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--teal);
+    border-radius: 4px; color: var(--teal);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── main layout ── */
+  main {
+    position: relative; z-index: 1;
+    max-width: 1400px; margin: 0 auto;
+    padding: 2.5rem 3rem;
+  }
+
+  /* ── upload zone ── */
+  .upload-section {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;
+    margin-bottom: 3rem;
+  }
+
+  .drop-zone {
+    border: 2px dashed rgba(14,158,142,0.4);
+    border-radius: 16px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(6,58,92,0.3);
+    position: relative; overflow: hidden;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--teal-bright);
+    background: rgba(14,158,142,0.08);
+    transform: translateY(-2px);
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%;
+  }
+  .drop-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+  .drop-zone h3 {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem; color: var(--teal-bright); margin-bottom: 0.4rem;
+  }
+  .drop-zone p { font-size: 0.78rem; color: var(--text-dim); }
+
+  /* preview dans la zone */
+  #preview-img {
+    display: none; width: 100%; border-radius: 8px;
+    margin-top: 1rem; max-height: 220px; object-fit: cover;
+  }
+
+  /* ── info panel ── */
+  .info-panel {
+    background: rgba(6,58,92,0.4);
+    border: 1px solid rgba(14,158,142,0.15);
+    border-radius: 16px; padding: 2rem;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .info-panel h3 {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem; color: var(--teal); margin-bottom: 1.2rem;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin-bottom: 0.6rem; font-size: 0.82rem;
+  }
+  .legend-dot {
+    width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+  }
+
+  .run-btn {
+    margin-top: 1.5rem;
+    width: 100%; padding: 0.9rem;
+    background: linear-gradient(135deg, var(--teal), var(--ocean-light));
+    border: none; border-radius: 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem; font-weight: 700;
+    color: white; cursor: pointer;
+    transition: all 0.25s ease;
+    letter-spacing: 0.03em;
+  }
+  .run-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(14,158,142,0.3);
+  }
+  .run-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* ── loader ── */
+  #loader {
+    display: none; text-align: center;
+    padding: 3rem; color: var(--teal);
+  }
+  .spinner {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 3px solid rgba(14,158,142,0.2);
+    border-top-color: var(--teal-bright);
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── results ── */
+  #results { display: none; }
+
+  .results-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--teal);
+    margin-bottom: 1.5rem;
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .results-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: rgba(14,158,142,0.2);
+  }
+
+  /* grille des résultats */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .card {
+    background: rgba(6,58,92,0.5);
+    border: 1px solid rgba(14,158,142,0.15);
+    border-radius: 14px; overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    animation: fadeUp 0.4s ease both;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card img {
+    width: 100%; display: block;
+    aspect-ratio: 480/352; object-fit: cover;
+  }
+
+  .card-body { padding: 1rem 1.1rem; }
+
+  .card-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem; font-weight: 700;
+    color: var(--teal-bright); margin-bottom: 0.6rem;
+  }
+
+  .metrics {
+    display: flex; gap: 0.5rem; flex-wrap: wrap;
+  }
+  .metric-pill {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem; padding: 0.2rem 0.55rem;
+    border-radius: 4px; font-weight: 700;
+  }
+  .metric-f1  { background: rgba(76,175,114,0.18); color: var(--posidonia); }
+  .metric-iou { background: rgba(14,158,142,0.18); color: var(--teal-bright); }
+  .metric-fp  { background: rgba(224,82,82,0.18);  color: var(--fp-red); }
+  .metric-fn  { background: rgba(74,143,212,0.18); color: var(--fn-blue); }
+
+  .no-gt-note {
+    font-size: 0.72rem; color: var(--text-dim);
+    font-style: italic; margin-top: 0.4rem;
+  }
+
+  .card.ensemble {
+    border: 2px solid var(--teal-bright);
+    box-shadow: 0 0 20px rgba(18,212,190,0.2);
+  }
+  .card.ensemble .card-title {
+    color: #ffffff;
+    font-size: 0.85rem;
+  }
+
+  .thr-preset-btn {
+  flex: 1; padding: 0.3rem;
+  background: transparent;
+  border: 1px solid rgba(14,158,142,0.3);
+  border-radius: 6px; color: var(--text-dim);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.62rem; cursor: pointer;
+  transition: all 0.2s;
+}
+.thr-preset-btn:hover {
+  border-color: var(--teal);
+  color: var(--teal-bright);
+}
+
+.uncertainty-box {
+  margin-top: 0.75rem;
+  padding: 0.7rem;
+  border-radius: 8px;
+  background: rgba(255, 200, 0, 0.08);
+  border: 1px solid rgba(255, 200, 0, 0.22);
+  font-size: 0.72rem;
+  color: var(--sand-light);
+  line-height: 1.6;
+}
+
+.uncertainty-box strong {
+  color: var(--teal-bright);
+}
+
+/* ==========================================================
+   Bloc modèles actifs : selects propres
+========================================================== */
+
+.models-options {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.option-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.option-row label {
+    min-width: 190px;
+    color: #eaf7ff;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.option-row select {
+    flex: 1;
+    height: 42px;
+    padding: 0 42px 0 14px;
+
+    background: #062f45;
+    color: #eaf7ff;
+
+    border: 1px solid rgba(0, 255, 220, 0.35);
+    border-radius: 10px;
+
+    font-size: 14px;
+    font-weight: 500;
+    outline: none;
+
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+
+    background-image:
+        linear-gradient(45deg, transparent 50%, #00e0c6 50%),
+        linear-gradient(135deg, #00e0c6 50%, transparent 50%);
+    background-position:
+        calc(100% - 22px) 17px,
+        calc(100% - 15px) 17px;
+    background-size: 7px 7px, 7px 7px;
+    background-repeat: no-repeat;
+
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.option-row select:hover {
+    border-color: #00e0c6;
+}
+
+.option-row select:focus {
+    border-color: #00e0c6;
+    box-shadow: 0 0 0 3px rgba(0, 224, 198, 0.18);
+}
+
+.option-row select option {
+    background: #062f45;
+    color: #eaf7ff;
+}
+
+/* Mobile */
+@media (max-width: 700px) {
+    .option-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .option-row label {
+        min-width: unset;
+    }
+}
+
+
+  /* footer */
+  footer {
+    text-align: center; padding: 2rem;
+    font-size: 0.72rem; color: var(--text-dim);
+    border-top: 1px solid rgba(14,158,142,0.1);
+    position: relative; z-index: 1;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+  <i class="bi bi-flower1" style="color:white; font-size:1.6rem;"></i>
+</div>
+  <div>
+    <h1>POSIDONIA SEGMENTATION</h1>
+    <p>Détection de Posidonia oceanica · GREAH Lab · M2 Informatique</p>
+  </div>
+  <div class="badge" id="models-badge">Chargement...</div>
+  <a href="/evaluate" style="
+   font-family:'Space Mono',monospace; font-size:0.65rem;
+   color:var(--teal); border:1px solid var(--teal);
+   padding:0.3rem 0.7rem; border-radius:4px; text-decoration:none;
+   margin-left:0.5rem;">
+  <i class="bi bi-graph-up"></i> Évaluation
+</a>
+</header>
+
+<main>
+
+  <!-- Upload + légende -->
+  <div class="upload-section">
+    <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" accept="image/*">
+        <div class="drop-icon">
+            <i class="bi bi-cloud-arrow-up" style="font-size:3rem; color:var(--teal-bright);"></i>
+        </div>
+      <h3>Déposer une image ici</h3>
+      <p>PNG, JPG — images du dataset Posidonia</p>
+      <img id="preview-img" alt="preview">
+      <div id="preview-preprocess-note" style="
+        display:none;
+        margin-top:0.6rem;
+        font-size:0.72rem;
+        color:var(--text-dim);
+        font-family:'Space Mono', monospace;
+      ">
+        Prétraitement appliqué : Aucun prétraitement
+      </div>
+    </div>
+
+    <div class="info-panel">
+      <div>
+        <h3>Légende des overlays</h3>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#00c800"></div>
+          <span><strong>Vert</strong> - TP : posidonie détectée (p ≥ 0.7)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#dc3232"></div>
+          <span><strong>Rouge</strong> - FP : fausse alarme (p ≥ 0.7)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#1450dc"></div>
+          <span><strong>Bleu</strong> - FN : posidonie manquée (p ≤ 0.3)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#ffc800;"></div>
+          <span><strong>Jaune</strong> - Zone incertaine selon Dirichlet</span>
+        </div>
+
+        <div style="font-size:0.75rem; color:var(--text-dim); margin-top:0.4rem; line-height:1.5;">
+          La carte d'incertitude met en évidence les pixels où la prédiction est moins fiable,
+          à partir d'une estimation Dirichlet calculée sur les probabilités du modèle.
+        </div>
+        <div class="legend-item" style="margin-top:0.8rem; padding-top:0.8rem; border-top:1px solid rgba(14,158,142,0.15)">
+          <span style="font-size:0.75rem; color:var(--text-dim)">
+              Le jaune marque les pixels où le modèle hésite (probabilité proche de 0.5),
+              cohérent avec les zones de transition ambiguës identifiées par les experts
+              (Martin-Abadal et al., 2018).
+          </span>
+        </div>
+      </div>
+
+      <!-- Slider seuil
+      <div style="margin-top:1.2rem; padding-top:1.2rem; border-top:1px solid rgba(14,158,142,0.15)">
+        <h3 style="margin-bottom:0.8rem;">SEUIL DE DÉCISION</h3>
+        <div style="display:flex; align-items:center; gap:1rem;">
+          <input type="range" id="threshold-slider"
+                min="0.1" max="0.9" step="0.05" value="0.5"
+                style="flex:1; accent-color:var(--teal-bright);">
+          <span id="threshold-value"
+                style="font-family:'Space Mono',monospace;
+                      font-size:0.9rem; color:var(--teal-bright);
+                      min-width:35px; text-align:right;">
+            0.50
+          </span>
+        </div>
+        <p style="font-size:0.72rem; color:var(--text-dim); margin-top:0.4rem;">
+          <i class="bi bi-chevron-double-down" style="color:#4a8fd4"></i>
+          Seuil bas <i class="bi bi-arrow-right-short"></i> plus de pixels posidonie
+          <span style="color:var(--posidonia)">recall <i class="bi bi-graph-up"></i></span>,
+          <span style="color:var(--fp-red)">précision <i class="bi bi-graph-down"></i></span><br>
+          <i class="bi bi-chevron-double-up" style="color:var(--posidonia)"></i>
+          Seuil haut <i class="bi bi-arrow-right-short"></i> moins de pixels posidonie
+          <span style="color:var(--posidonia)">précision <i class="bi bi-graph-up"></i></span>,
+          <span style="color:var(--fp-red)">recall <i class="bi bi-graph-down"></i></span>
+        </p>
+      </div>
+
+     Méthode du seuil pré-chargé 
+      <div style="margin-top:0.8rem;">
+        <p style="font-size:0.7rem; color:var(--text-dim); margin-bottom:0.4rem;">
+          <i class="bi bi-magic"></i> Seuil pré-chargé depuis les JSON :
+        </p>
+        <div style="display:flex; gap:0.5rem;">
+          <button onclick="updateThresholdFromMethod('mean')" class="thr-preset-btn" id="thr-mean">
+            Moyenne
+          </button>
+          <button onclick="updateThresholdFromMethod('min')" class="thr-preset-btn" id="thr-min">
+            Minimum
+          </button>
+          <button onclick="updateThresholdFromMethod('max')" class="thr-preset-btn" id="thr-max">
+            Maximum
+          </button>
+        </div>
+      </div>
+    -->
+
+      <!-- Choix méthode ensemble -->
+      <div style="margin-top:1rem;">
+        <h3 style="margin-bottom:0.7rem;">MÉTHODE ENSEMBLE</h3>
+        <div style="display:flex; gap:0.75rem;">
+
+          <label style="flex:1; cursor:pointer;">
+            <input type="radio" name="ensemble_method" value="soft" checked
+                  style="display:none;" id="radio-soft">
+            <div class="method-btn" id="btn-soft" onclick="selectMethod('soft')"
+                style="text-align:center; padding:0.6rem; border-radius:8px;
+                        border:1px solid var(--teal); background:rgba(14,158,142,0.2);
+                        font-family:'Space Mono',monospace; font-size:0.7rem;
+                        color:var(--teal-bright); cursor:pointer;">
+              <i class="bi bi-bar-chart-line" style="font-size:1.1rem; display:block; margin-bottom:0.2rem;"></i>
+              SOFT VOTING<br>
+              <span style="font-size:0.6rem; color:var(--text-dim);">moyenne des probas</span>
+            </div>
+          </label>
+
+          <label style="flex:1; cursor:pointer;">
+            <input type="radio" name="ensemble_method" value="hard"
+                  style="display:none;" id="radio-hard">
+            <div class="method-btn" id="btn-hard" onclick="selectMethod('hard')"
+                style="text-align:center; padding:0.6rem; border-radius:8px;
+                        border:1px solid rgba(14,158,142,0.3); background:transparent;
+                        font-family:'Space Mono',monospace; font-size:0.7rem;
+                        color:var(--text-dim); cursor:pointer;">
+              <i class="bi bi-people" style="font-size:1.1rem; display:block; margin-bottom:0.2rem;"></i>
+              HARD VOTING<br>
+              <span style="font-size:0.6rem; color:var(--text-dim);">vote majoritaire</span>
+            </div>
+          </label>
+
+        </div>
+      </div>
+
+      <!-- Sélection des modèles -->
+      <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid rgba(14,158,142,0.15)">
+        <h3 style="margin-bottom:0.7rem;">MODÈLES ACTIFS</h3>
+        <div id="model-checkboxes"></div>
+      </div>
+
+      <div class="models-options">
+          <div class="option-row">
+            <label for="inference_preprocess">Prétraitement appliqué à l'image</label>
+            <select id="inference_preprocess" name="inference_preprocess">
+                <option value="none" selected>Aucun prétraitement</option>
+                <option value="clahe">CLAHE</option>
+                <option value="expansion_rgb">Expansion RGB + égalisation</option>
+            </select>
+          </div>
+
+          <div class="option-row">
+              <label for="threshold_mode">Mode de seuil</label>
+              <select id="threshold_mode" name="threshold_mode">
+                  <option value="fixed">Seuil fixe 0.5</option>
+                  <option value="calibrated">Seuil calibré validation</option>
+              </select>
+          </div>
+
+          <div class="option-row">
+              <label for="uncertainty_mode">Mode d'incertitude</label>
+              <select id="uncertainty_mode" name="uncertainty_mode">
+                  <option value="standard">Dirichlet standard, centré 0.5</option>
+                  <option value="threshold">Dirichlet adapté au seuil</option>
+              </select>
+          </div>
+      </div>
+
+      <button class="run-btn" id="run-btn" disabled>
+        LANCER LA SEGMENTATION
+      </button>
+
+    </div>
+  </div>
+
+  <!-- Loader -->
+  <div id="loader">
+    <div class="spinner"></div>
+    <p style="font-family:'Space Mono',monospace; font-size:0.8rem">
+      Segmentation en cours…
+    </p>
+  </div>
+
+  <!-- Résultats -->
+  <div id="results">
+    <div class="results-title">Résultats de segmentation</div>
+    <div class="cards-grid" id="cards-grid"></div>
+  </div>
+
+</main>
+
+<footer>
+  Stage M2 Informatique · Université Sorbonne Paris Nord · GREAH Laboratory · Le Havre
+</footer>
+
+<script>
+
+// Charge les noms des modèles au démarrage
+// Au démarrage — charge config complète
+fetch('/config')
+  .then(r => r.json())
+  .then(cfg => {
+    window.appConfig = cfg;
+
+    const shortNames = cfg.models.map(name => {
+      if (name.includes('FCN')) return 'FCN';
+      if (name.includes('U-Net')) return 'U-Net';
+
+      for (const v of ['B0', 'B1', 'B2', 'B3', 'B4', 'B5']) {
+        if (name.includes(v)) return `SegFormer-${v}`;
+      }
+
+      return name;
+    });
+
+    // Supprime les doublons en gardant l'ordre d'apparition
+    const uniqueShortNames = [...new Set(shortNames)];
+
+    document.getElementById('models-badge').textContent = uniqueShortNames.join(' · ');
+
+    renderModelCheckboxes(cfg.models, cfg.fixed_thresholds || {});
+    updateDisplayedThresholds();
+  })
+  .catch(err => {
+    console.error('Erreur /config :', err);
+    document.getElementById('models-badge').textContent = 'Erreur config';
+  });
+
+
+function updateThresholdFromMethod(method) {
+  const cfg = window.appConfig;
+  if (!cfg) return;
+  const val = method === 'mean' ? cfg.thr_mean
+            : method === 'min'  ? cfg.thr_min
+            : cfg.thr_max;
+  setThreshold(val);
+}
+
+function selectMethod(method) {
+  document.getElementById('radio-' + method).checked = true;
+
+  const btns = ['soft', 'hard'];
+
+  btns.forEach(m => {
+    const btn = document.getElementById('btn-' + m);
+    if (!btn) return;
+
+    if (m === method) {
+      btn.style.border     = '1px solid var(--teal)';
+      btn.style.background = 'rgba(14,158,142,0.2)';
+      btn.style.color      = 'var(--teal-bright)';
+    } else {
+      btn.style.border     = '1px solid rgba(14,158,142,0.3)';
+      btn.style.background = 'transparent';
+      btn.style.color      = 'var(--text-dim)';
+    }
+  });
+}
+
+
+const fileInput  = document.getElementById('file-input');
+const dropZone   = document.getElementById('drop-zone');
+const previewImg = document.getElementById('preview-img');
+const runBtn     = document.getElementById('run-btn');
+const loader     = document.getElementById('loader');
+const results    = document.getElementById('results');
+const cardsGrid  = document.getElementById('cards-grid');
+
+
+
+let selectedFile = null;
+
+function preprocessLabel(value) {
+  if (value === 'clahe') {
+    return 'CLAHE';
+  }
+
+  if (value === 'expansion_rgb') {
+    return 'Expansion RGB + égalisation';
+  }
+
+  return 'Aucun prétraitement';
+}
+
+function updatePreprocessNote() {
+  const select = document.getElementById('inference_preprocess');
+  const note = document.getElementById('preview-preprocess-note');
+
+  if (!select || !note) return;
+
+  note.textContent = `Prétraitement appliqué : ${preprocessLabel(select.value)}`;
+
+  if (selectedFile) {
+    note.style.display = 'block';
+  }
+}
+
+// Charger l'image prétraitée
+document
+  .getElementById('inference_preprocess')
+  .addEventListener('change', updatePreprocessNote);
+
+// Met à jour automatiquement les seuils affichés quand on passe de 0.5 au seuil calibré validation
+document
+  .getElementById('threshold_mode')
+  .addEventListener('change', updateDisplayedThresholds);
+
+// ── drag & drop ──
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) setFile(f);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) setFile(fileInput.files[0]);
+});
+
+const thresholdSlider = document.getElementById('threshold-slider');
+const thresholdValue  = document.getElementById('threshold-value');
+
+if (thresholdSlider && thresholdValue) {
+  thresholdSlider.addEventListener('input', () => {
+    thresholdValue.textContent = parseFloat(thresholdSlider.value).toFixed(2);
+  });
+}
+
+function setFile(f) {
+  selectedFile = f;
+  const url = URL.createObjectURL(f);
+
+  previewImg.src = url;
+  previewImg.style.display = 'block';
+
+  updatePreprocessNote();
+
+  runBtn.disabled = false;
+}
+
+function setThreshold(val) {
+  const slider = document.getElementById('threshold-slider');
+  const label  = document.getElementById('threshold-value');
+
+  if (!slider || !label) return;
+
+  slider.value = val;
+  label.textContent = parseFloat(val).toFixed(2);
+  // Déclenche l'événement pour forcer le rendu visuel de la barre
+  slider.dispatchEvent(new Event('input'));
+}
+
+function renderModelCheckboxes(models, thresholds = {}) {
+  const container = document.getElementById('model-checkboxes');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  models.forEach((name, idx) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = 'selected_models';
+    input.value = name;
+    input.checked = true;
+    input.id = `chk-model-${idx}`;
+    input.style.cssText = 'accent-color:var(--teal-bright); width:14px; height:14px;';
+
+    const label = document.createElement('label');
+    label.htmlFor = input.id;
+    label.style.cssText = 'font-size:0.78rem; cursor:pointer;';
+    label.appendChild(document.createTextNode(name + ' '));
+
+    const span = document.createElement('span');
+    span.className = 'model-threshold-value';
+    span.dataset.modelName = name;
+    span.style.cssText = 'font-size:0.65rem; color:var(--text-dim);';
+
+    if (thresholds[name] !== undefined) {
+      span.textContent = `(seuil=${Number(thresholds[name]).toFixed(2)})`;
+    }
+
+    label.appendChild(span);
+    div.appendChild(input);
+    div.appendChild(label);
+    container.appendChild(div);
+  });
+}
+
+function updateDisplayedThresholds() {
+  const cfg = window.appConfig;
+  const select = document.getElementById('threshold_mode');
+
+  if (!cfg || !select) return;
+
+  const mode = select.value;
+  const thresholds = mode === 'calibrated'
+    ? (cfg.calibrated_thresholds || {})
+    : (cfg.fixed_thresholds || {});
+
+  document.querySelectorAll('.model-threshold-value').forEach(span => {
+    const name = span.dataset.modelName;
+    const thr = thresholds[name];
+
+    if (thr === undefined || thr === null) {
+      span.textContent = '';
+    } else {
+      span.textContent = `(seuil=${Number(thr).toFixed(2)})`;
+    }
+  });
+}
+
+
+function formatThresholdUsed(value) {
+  if (value === 'individual_calibrated_thresholds') {
+    return 'seuils calibrés individuels';
+  }
+
+  if (value === 'individual_thresholds') {
+    return 'seuils individuels';
+  }
+
+  if (typeof value === 'number') {
+    return value.toFixed(2);
+  }
+
+  const parsed = Number(value);
+  if (!Number.isNaN(parsed)) {
+    return parsed.toFixed(2);
+  }
+
+  return value || '—';
+}
+
+function formatThresholdMode(mode) {
+  return mode === 'calibrated'
+    ? 'calibré validation'
+    : 'fixe 0.5';
+}
+
+function formatUncertaintyMode(mode) {
+  return mode === 'threshold'
+    ? 'adaptée au seuil'
+    : 'standard centrée sur 0.5';
+}
+
+// ── lancement ──
+runBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+
+  // Reset UI
+  results.style.display = 'none';
+  loader.style.display = 'block';
+  runBtn.disabled = true;
+  cardsGrid.innerHTML = '';
+
+  const fd = new FormData();
+
+  fd.append('image', selectedFile);
+
+  const selectedMethod = document.querySelector('input[name="ensemble_method"]:checked').value;
+  fd.append('ensemble_method', selectedMethod);
+
+fd.append(
+  'threshold_mode',
+  document.getElementById('threshold_mode').value
+);
+
+fd.append(
+  'uncertainty_mode',
+  document.getElementById('uncertainty_mode').value
+);
+
+fd.append(
+  'inference_preprocess',
+  document.getElementById('inference_preprocess').value
+);
+
+  // Récupère les modèles cochés
+  document.querySelectorAll('input[name="selected_models"]:checked')
+    .forEach(cb => fd.append('selected_models', cb.value));
+
+  try {
+    const resp = await fetch('/predict', {
+      method: 'POST',
+      body: fd
+    });
+
+    const data = await resp.json();
+
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+
+    const panels = [
+      {
+        title: 'Image originale',
+        img: data.original,
+        metrics: null,
+        delay: 0
+      }
+    ];
+
+    if (data.preprocessed && data.inference_preprocess !== 'none') {
+      panels.push({
+        title: 'Image prétraitée — ' + data.inference_preprocess_label,
+        img: data.preprocessed,
+        metrics: null,
+        delay: 1
+      });
+    }
+
+    if (data.has_gt) {
+      const src = data.gt_source === 'training'
+        ? ' (training set)'
+        : ' (testing set)';
+
+      panels.push({
+        title: 'Masque GT' + src,
+        img: data.gt,
+        metrics: null,
+        delay: 1
+      });
+    }
+
+    data.results.forEach((r, i) => {
+      const isEnsemble = r.name.startsWith('Ensemble');
+
+      panels.push({
+        title: r.name,
+
+        class_overlay: r.class_overlay,
+        probability_map: r.probability_map,
+        error_overlay: r.error_overlay,
+        uncertainty_overlay: r.uncertainty_overlay,
+
+        metrics: r.metrics,
+        uncertainty: r.uncertainty,
+
+        threshold_used: r.threshold_used,
+        threshold_mode: r.threshold_mode,
+
+        posidonia_cover: r.posidonia_cover_percent,
+        inference_preprocess_label: data.inference_preprocess_label,
+
+        delay: i + (data.has_gt ? 2 : 1),
+        ensemble: isEnsemble
+      });
+    });
+
+    panels.forEach(p => {
+      const card = document.createElement('div');
+      card.className = p.ensemble ? 'card ensemble' : 'card';
+      card.style.animationDelay = `${p.delay * 0.08}s`;
+
+      let metricsHtml = '';
+
+      if (p.metrics) {
+        metricsHtml = `
+          <div class="metrics">
+            <span class="metric-pill metric-f1">F1 ${p.metrics.f1}</span>
+            <span class="metric-pill metric-iou">IoU ${p.metrics.iou}</span>
+            <span class="metric-pill metric-fp">Fall-out ${p.metrics.fallout_percent}</span>
+            <span class="metric-pill metric-fp">FP ${p.metrics.fp}</span>
+            <span class="metric-pill metric-fn">FN ${p.metrics.fn}</span>
+          </div>
+        `;
+      } else if (p.class_overlay) {
+        metricsHtml = `
+          <p class="no-gt-note">Métriques indisponibles (image hors dataset)</p>
+        `;
+      }
+
+      let uncertaintyHtml = '';
+
+      if (p.uncertainty) {
+        const uncertaintyModeText = formatUncertaintyMode(p.uncertainty.mode);
+        const thresholdModeText = formatThresholdMode(p.threshold_mode);
+
+        if (p.uncertainty.type === 'single_model_dirichlet') {
+          uncertaintyHtml = `
+            <div class="uncertainty-box">
+              <div><strong>Prétraitement image :</strong> ${p.inference_preprocess_label}</div>
+              <div><strong>Mode seuil :</strong> ${thresholdModeText}</div>
+              <div><strong>Seuil utilisé :</strong> ${formatThresholdUsed(p.threshold_used)}</div>
+              <div><strong>Mode incertitude :</strong> ${uncertaintyModeText}</div>
+              <div><strong>Couverture posidonie :</strong> ${p.posidonia_cover.toFixed(2)} %</div>
+              <div><strong>Incertitude Dirichlet moyenne :</strong> ${p.uncertainty.dirichlet_uncertainty_norm_mean.toFixed(4)}</div>
+              <div><strong>Pixels incertains Dirichlet :</strong> ${p.uncertainty.dirichlet_uncertain_pixel_percent.toFixed(2)} %</div>
+            </div>
+          `;
+        }
+
+        if (p.uncertainty.type === 'ensemble_dirichlet') {
+          uncertaintyHtml = `
+            <div class="uncertainty-box">
+              <div><strong>Mode seuil :</strong> ${thresholdModeText}</div>
+              <div><strong>Seuil utilisé :</strong> ${formatThresholdUsed(p.threshold_used)}</div>
+              <div><strong>Mode incertitude :</strong> ${uncertaintyModeText}</div>
+              <div><strong>Couverture posidonie :</strong> ${p.posidonia_cover.toFixed(2)} %</div>
+              <div><strong>Accord moyen :</strong> ${p.uncertainty.agreement_percent.toFixed(2)} %</div>
+              <div><strong>Désaccord moyen :</strong> ${p.uncertainty.disagreement_percent.toFixed(2)} %</div>
+              <div><strong>Pixels en désaccord :</strong> ${p.uncertainty.uncertain_pixel_percent.toFixed(2)} %</div>
+              <div><strong>Incertitude Dirichlet moyenne :</strong> ${p.uncertainty.dirichlet_uncertainty_norm_mean.toFixed(4)}</div>
+              <div><strong>Pixels incertains Dirichlet :</strong> ${p.uncertainty.dirichlet_uncertain_pixel_percent.toFixed(2)} %</div>
+            </div>
+          `;
+        }
+      }
+
+      const isModel = Boolean(p.class_overlay);
+
+      if (isModel) {
+        card.innerHTML = `
+          <div style="display:flex; gap:4px; flex-wrap:wrap;">
+            ${p.probability_map ? `
+              <div style="flex:1; min-width:120px;">
+                <img src="data:image/png;base64,${p.probability_map}" alt="${p.title} - probabilité" style="width:100%;">
+                <div style="font-size:10px; text-align:center; opacity:0.7;">Probabilité posidonie</div>
+              </div>
+            ` : ''}
+
+            <div style="flex:1; min-width:120px;">
+              <img src="data:image/png;base64,${p.class_overlay}" alt="${p.title} - classes" style="width:100%;">
+              <div style="font-size:10px; text-align:center; opacity:0.7;">Classes natives</div>
+            </div>
+
+            ${p.error_overlay ? `
+              <div style="flex:1; min-width:120px;">
+                <img src="data:image/png;base64,${p.error_overlay}" alt="${p.title} - erreurs" style="width:100%;">
+                <div style="font-size:10px; text-align:center; opacity:0.7;">Erreurs FP/FN</div>
+              </div>
+            ` : ''}
+
+            ${p.uncertainty_overlay ? `
+              <div style="flex:1; min-width:120px;">
+                <img src="data:image/png;base64,${p.uncertainty_overlay}" alt="${p.title} - incertitude" style="width:100%;">
+                <div style="font-size:10px; text-align:center; opacity:0.7;">Incertitude Dirichlet</div>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="card-body">
+            <div class="card-title">${p.title}</div>
+            ${metricsHtml}
+            ${uncertaintyHtml}
+          </div>
+        `;
+      } else {
+        card.innerHTML = `
+          <img src="data:image/png;base64,${p.img}" alt="${p.title}">
+          <div class="card-body">
+            <div class="card-title">${p.title}</div>
+            ${metricsHtml}
+          </div>
+        `;
+      }
+
+      cardsGrid.appendChild(card);
+    });
+
+    loader.style.display = 'none';
+    results.style.display = 'block';
+
+  } catch (err) {
+    alert('Erreur : ' + err.message);
+  } finally {
+    runBtn.disabled = false;
+    loader.style.display = 'none';
+  }
+});
+
+</script>
+</body>
+</html>

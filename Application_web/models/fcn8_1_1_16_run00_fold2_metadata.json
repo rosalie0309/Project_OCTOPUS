@@ -1,0 +1,52 @@
+{
+  "name": "fcn8_1_1_16_run00_fold2",
+  "tag": "1_1_16",
+  "run_id": 0,
+  "fold": 1,
+  "n_iter": 16000,
+  "lr": 1e-05,
+  "augment": true,
+  "n_train": 301,
+  "n_val": 75,
+  "n_extra": 94,
+  "ckpt_path": "D:\\Corine\\STAGE_M2_GREAH\\impl\u00e9mentation_d\u00e9tection_posidonie\\fcn_vgg16\\results\\kfold\\fcn8_1_1_16_run00_fold2.pth",
+  "best_val_path": "D:\\Corine\\STAGE_M2_GREAH\\impl\u00e9mentation_d\u00e9tection_posidonie\\fcn_vgg16\\results\\kfold\\fcn8_1_1_16_run00_fold2_bestval.pth",
+  "mix_metrics": {
+    "accuracy": 0.9583595679012271,
+    "precision": 0.9295071107214384,
+    "recall": 0.9681463552902886,
+    "fallout": 0.048044402921201206,
+    "TP": 4962816,
+    "FP": 376375,
+    "TN": 7457524,
+    "FN": 163285,
+    "threshold": 0.4,
+    "tradeoff": 0.9600509761845437
+  },
+  "mix_auc": 0.9883313293906428,
+  "extra_metrics": {
+    "accuracy": 0.9668044473995212,
+    "precision": 0.9557218917431,
+    "recall": 0.9708234371884042,
+    "fallout": 0.03645279401684116,
+    "TP": 7059197,
+    "FP": 327049,
+    "TN": 8644801,
+    "FN": 212153,
+    "threshold": 0.4,
+    "tradeoff": 0.9671853215857815
+  },
+  "extra_auc": 0.9957480649590708,
+  "history_last": {
+    "train_loss": 0.02633677782808445,
+    "val_loss": 0.2428248243921093,
+    "train_acc": 0.9890494299768515,
+    "val_acc": 0.9589079475308567,
+    "train_prec": 0.9870189298881991,
+    "val_prec": 0.9340674210645105,
+    "train_rec": 0.9885296586026336,
+    "val_rec": 0.9641667224270267,
+    "train_fall": 0.010529601545035424,
+    "val_fall": 0.04453312456542975
+  }
+}
